@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Химическая лаборатория — Демо</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 1rem; background: #f5f7fa; color: #222; }
+    h1, h2 { margin-bottom: 0.5rem; }
+    .group-panel { background: #fff; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+    .group-title { font-weight: bold; margin-top: 1rem; }
+    button { cursor: pointer; padding: 0.4rem 0.8rem; border: 1px solid #ccc; background: #fff; border-radius: 4px; }
+    button.selected { background: #e3f2fd; border-color: #2196f3; }
+    button.primary { background: #2196f3; color: #fff; border: none; border-radius: 6px; padding: 0.6rem 1.2rem; margin-right: 0.5rem;}
+    button.danger { background: #ff7043; color: #fff; border: none; border-radius: 6px; padding: 0.6rem 1.2rem;}
+    button.info { background: #90a4ae; color: #fff; border: none; border-radius: 6px; padding: 0.6rem 1.2rem;}
+    #result-area { margin-top: 1.5rem; padding: 1rem; background: #fff; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); display: none; }
+    .reaction-line { font-size: 1.2rem; font-family: monospace; margin: 0.5rem 0; }
+    .explanation { margin-top: 0.5rem; color: #444; line-height: 1.5; }
+    .conditions-row { margin: 0.3rem 0; color: #555; }
+    label { margin-right: 1rem; display: inline-block; }
+    .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; color: #fff; vertical-align: middle; }
+    .badge-heat { background: #ff9800; }
+    .badge-cat { background: #9c27b0; }
+    .author-badge { display: block; margin-top: 1rem; padding: 8px 12px; background: #e8f5e9; border-radius: 6px; color: #00695c; font-size: 0.9rem; text-align: center;}
+  </style>
+</head>
+<body>
+  <h1>🧪 Химическая лаборатория — Демо</h1>
+
+  <div class="author-badge">
+    Демо‑версия. Автор: Ласковец Д.Н.
+  </div>
+
+  <p>Выбери по одному веществу из разных групп, выбери условия и нажми «Провести опыт».</p>
+
+  <div id="controls">
+    <label>Оборудование: <select id="equipment">
+      <option value="колба">Колба</option>
+      <option value="пробирка">Пробирка</option>
+      <option value="стакан">Стакан</option>
+    </select></label>
+
+    <div style="margin-top:0.5rem;">
+      <label><input type="checkbox" id="heat" /> <span class="badge badge-heat">Нагрев</span></label>
+      <label><input type="checkbox" id="catalyst" /> <span class="badge badge-cat">Катализатор</span></label>
+    </div>
+  </div>
+
+  <div id="groups-container"></div>
+
+  <div style="margin: 1.5rem 0;">
+    <button id="run-experiment" class="primary">Провести опыт</button>
+    <button id="reset-experiment" class="danger">Сбросить опыт</button>
+    <button id="about-btn" class="info">Об игре</button>
+  </div>
+
+  <div id="result-area">
+    <h2>Результат опыта</h2>
+    <div class="reaction-line" id="reaction-text"></div>
+    
+    <div class="conditions-row">
+      <strong>Оборудование:</strong> <span id="result-equipment"></span>
+    </div>
+    <div class="conditions-row">
+      <strong>Условия:</strong> <span id="result-conditions"></span>
+    </div>
+    <div class="explanation" id="explanation-text"></div>
+  </div>
+
+  <script>
+    // --- ДАННЫЕ (легко расширять) ---
+    const groups = [
+      { id: 'acids', title: 'Кислоты', items: [
+        { id: 'hcl', name: 'Соляная кислота (HCl)', type: 'acid' },
+        { id: 'h2so4', name: 'Серная кислота (H₂SO₄)', type: 'acid' },
+        { id: 'ch3cooh', name: 'Уксусная кислота (CH₃COOH)', type: 'acid' }
+      ]},
+      { id: 'bases', title: 'Основания', items: [
+        { id: 'naoh', name: 'Гидроксид натрия (NaOH)', type: 'base' },
+        { id: 'nh4oh', name: 'Гидроксид аммония (NH₄OH)', type: 'base' }
+      ]},
+      { id: 'metals', title: 'Металлы', items: [
+        { id: 'zn', name: 'Цинк (Zn)', type: 'metal' },
+        { id: 'fe', name: 'Железо (Fe)', type: 'metal' },
+        { id: 'al', name: 'Алюминий (Al)', type: 'metal' }
+      ]},
+      { id: 'salts', title: 'Соли', items: [
+        { id: 'nacl', name: 'Хлорид натрия (NaCl)', type: 'salt' },
+        { id: 'cuso4', name: 'Сульфат меди (CuSO₄)', type: 'salt' }
+      ]}
+    ];
+
+    const reactions = {
+      'hcl_zn': {
+        formula: 'Zn + 2HCl → ZnCl₂ + H₂↑',
+        explanation: 'Цинк реагирует с соляной кислотой. Выделяется водород (газ), образуется хлорид цинка.',
+        heatDesc: 'При нагреве реакция ускоряется, выделение газа становится более бурным.',
+        catDesc: 'Катализатор не требуется.'
+      },
+      'ch3cooh_naoh': {
+        formula: 'CH₃COOH + NaOH → CH₃COONa + H₂O',
+        explanation: 'Реакция нейтрализации уксусной кислоты и щёлочи. Образуется ацетат натрия и вода.',
+        heatDesc: 'Нагрев ускоряет процесс, но не обязателен.',
+        catDesc: 'Катализатор не нужен.'
+      },
+      'h2o2_catalase': {
+        formula: '2H₂O₂ → 2H₂O + O₂↑ (с катализатором)',
+        explanation: 'Разложение перекиси водорода. Без катализатора реакция идёт очень медленно. С катализатором — мгновенно, с бурным выделением кислорода (пена).',
+        heatDesc: 'Нагрев дополнительно ускоряет разложение, но может быть опасен из‑за бурной реакции.',
+        catDesc: 'Катализатор критически важен: он снижает энергию активации, позволяя реакции идти при комнатной температуре.'
+      },
+      'fe_cuso4': {
+        formula: 'Fe + CuSO₄ → FeSO₄ + Cu↓',
+        explanation: 'Железо вытесняет медь из раствора сульфата меди. На поверхности железа появляется красно‑коричневый налёт меди, раствор бледнеет.',
+        heatDesc: 'Нагрев незначительно ускоряет процесс.',
+        catDesc: 'Катализатор не требуется.'
+      },
+      'al_hcl': {
+        formula: '2Al + 6HCl → 2AlCl₃ + 3H₂↑',
+        explanation: 'Алюминий реагирует с соляной кислотой с выделением водорода. Внимание: на воздухе алюминий покрыт оксидной плёнкой, мешающей реакции — в игре считаем, что она уже удалена.',
+        heatDesc: 'Нагрев помогает быстрее разрушить остаточные оксидные слои и ускоряет реакцию.',
+        catDesc: 'Катализаторы для этой реакции не применяются.'
+      }
+    };
+
+    function addBidirectional(key1, key2, data) {
+      reactions[`${key1}_${key2}`] = data;
+      reactions[`${key2}_${key1}`] = data;
+    }
+    addBidirectional('h2o2', 'catalase', reactions['h2o2_catalase']);
+
+    // --- ИНТЕРФЕЙС ---
+    const groupsContainer = document.getElementById('groups-container');
+    const selected = { item1: null, item2: null };
+
+    function renderGroups() {
+      groupsContainer.innerHTML = '';
+      groups.forEach(group => {
+        const panel = document.createElement('div');
+        panel.className = 'group-panel';
+        panel.innerHTML = `<h3 class="group-title">${group.title}</h3>`;
+        group.items.forEach(item => {
+          const btn = document.createElement('button');
+          btn.textContent = item.name;
+          btn.dataset.id = item.id;
+          btn.onclick = () => selectItem(item, group.id);
+          panel.appendChild(btn);
+        });
+        groupsContainer.appendChild(panel);
+      });
+    }
+
+    function selectItem(item, groupId) {
+      if (!selected.item1) {
+        selected.item1 = item;
+      } else if (!selected.item2) {
+        if (selected.item1.type === item.type) {
+          alert('Выбери вещество из другой группы!');
+          return;
+        }
+        selected.item2 = item;
+      } else {
+        alert('Сначала нажми “Провести опыт” или сбрось выбор.');
+      }
+      renderGroups();
+      updateSelectionVisuals();
+    }
+
+    function updateSelectionVisuals() {
+      const allBtns = document.querySelectorAll('#groups-container button');
+      allBtns.forEach(btn => {
+        const id = btn.dataset.id;
+        if (id === selected.item1?.id || id === selected.item2?.id) {
+          btn.classList.add('selected');
+        } else {
+          btn.classList.remove('selected');
+        }
+      });
+    }
+
+    document.getElementById('run-experiment').addEventListener('click', () => {
+      if (!selected.item1 || !selected.item2) {
+        alert('Выбери по одному веществу из разных групп!');
+        return;
+      }
+
+      const key = `${selected.item1.id}_${selected.item2.id}`;
+      const reaction = reactions[key] || null;
+
+      const resultArea = document.getElementById('result-area');
+      resultArea.style.display = 'block';
+
+      if (reaction) {
+        document.getElementById('reaction-text').textContent = reaction.formula;
+        document.getElementById('explanation-text').textContent = reaction.explanation;
+      } else {
+        document.getElementById('reaction-text').textContent = 'Реакция не найдена для этой пары веществ.';
+        document.getElementById('explanation-text').textContent = 'Попробуй другую комбинацию. Возможно, такая реакция не протекает или требует особых условий.';
+      }
+
+      const heat = document.getElementById('heat').checked;
+      const catalyst = document.getElementById('catalyst').checked;
+      const equipment = document.getElementById('equipment').value;
+
+      document.getElementById('result-equipment').textContent = equipment;
+
+      let conditionsText = [];
+      if (heat) conditionsText.push('нагрев');
+      if (catalyst) conditionsText.push('катализатор');
+      document.getElementById('result-conditions').textContent = conditionsText.length ? conditionsText.join(', ') : 'без особых условий';
+
+      // Динамические описания условий
+      if (reaction && (heat || catalyst)) {
+        let extraInfo = [];
+        if (heat && reaction.heatDesc) extraInfo.push('💡 Влияние нагрева: ' + reaction.heatDesc);
+        if (catalyst && reaction.catDesc) extraInfo.push('🧪 Роль катализатора: ' + reaction.catDesc);
+        
+        if (extraInfo.length > 0) {
+          document.getElementById('explanation-text').textContent += '\n\n' + extraInfo.join('\n');
+        }
+      }
+    });
+
+    document.getElementById('reset-experiment').addEventListener('click', () => {
+      selected.item1 = null;
+      selected.item2 = null;
+      
+      document.getElementById('heat').checked = false;
+      document.getElementById('catalyst').checked = false;
+      document.getElementById('equipment').selectedIndex = 0;
+
+      document.getElementById('result-area').style.display = 'none';
+      
+      renderGroups();
+      alert('Опыт сброшен. Можно выбирать новые вещества!');
+    });
+
+    document.getElementById('about-btn').addEventListener('click', () => {
+      alert('Химическая лаборатория — демо‑версия.\n\nАвтор: Ласковец Д.Н.\n\nИгра показывает базовые реакции, условия и пояснения. Можно расширять базу веществ и реакций.');
+    });
+
+    renderGroups();
+  </script>
+</body>
+</html>
